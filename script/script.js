@@ -2,6 +2,7 @@ var $message = $("#message"),
     $letters = $("#spaces"),
     $guesses = $("#guesses"),
     $apples = $("#apples");
+    $replay = $("#replay");
 
 var randomWord = (function() {
   var words = ["abacus", "quotient", "octothorpe", "proselytize", "stipend"];
@@ -41,6 +42,7 @@ function Game() {
 }
 
 Game.prototype = {
+  num_guesses: 6,
   createBlanks: function() {
     var spaces = (new Array(this.word.length + 1)).join("<span></span>");
 
@@ -51,6 +53,10 @@ Game.prototype = {
 
   displayMessage: function(text) {
     $message.text(text);
+  },
+
+  toggleReplayLink: function(which) {
+    $replay.toggle(which);
   },
 
   fillBlanksFor: function(letter) {
@@ -64,19 +70,63 @@ Game.prototype = {
     });
   },
 
+  duplicateGuess: function(letter) {
+    var duplicate = this.guesses.indexOf(letter) !== -1;
+
+    if (!duplicate) { this.guesses.push(letter); }
+
+    return duplicate;
+  },
+
   processGuess: function(e) {
     var letter = String.fromCharCode(e.which);
 
     if (notALetter(e.which)) { return; }
+    if (this.duplicateGuess(letter)) { return; }
+
     if ($.inArray(letter, this.word) !== -1) {
       this.fillBlanksFor(letter);
       this.renderGuess(letter);
       if (this.correct_spaces == this.$spaces.length) {
-        this.displayMessage("You win!");
+        this.win();
       }
     } else {
-      this.renderGuess(letter);
+      this.renderIncorrectGuess(letter);
     }
+    if (this.incorrect_guesses === this.num_guesses) {
+      this.lose();
+    }
+  },
+
+  win: function() {
+    this.unbind();
+    this.displayMessage("You win!");
+    this.toggleReplayLink(true);
+    this.setGameStatus("win");
+  },
+
+  lose: function() {
+    this.unbind();
+    this.displayMessage("You're out of guesses!");
+    this.toggleReplayLink(true);
+    this.setGameStatus("lose");
+  },
+
+  setGameStatus: function(status) {
+    $(document.body).removeClass();
+    if (status) {
+      $(document.body).addClass(status);
+    }
+  },
+
+  renderIncorrectGuess: function(letter) {
+    this.incorrect_guesses++;
+    this.renderGuess(letter);
+    this.setClass();
+  },
+
+  setClass: function() {
+    $apples.removeClass().addClass("guess_" + this.incorrect_guesses);
   },
 
   renderGuess: function(letter) {
@@ -90,13 +140,21 @@ Game.prototype = {
   },
 
   bind: function() {
-    $(document).on("keypress", this.processGuess.bind(this));
+    $(document).on("keypress.game", this.processGuess.bind(this));
+  },
+
+  unbind: function() {
+    $(document).off(".game");
   },
 
   init: function() {
     this.bind();
+    this.setClass();
+    this.toggleReplayLink(false);
     this.createBlanks();
     this.emptyGuesses();
+    this.setGameStatus();
+    this.displayMessage("");
   }
 };
 
@@ -108,3 +166,9 @@ function notALetter(code) {
 }
 
 new Game();
+
+$replay.click(function(e) {
+  e.preventDefault();
+
+  new Game();
+});
